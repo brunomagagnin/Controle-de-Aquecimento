@@ -1,0 +1,101 @@
+//SOBRE A CONSTRUÇÃO DESSE BLOCO E FUNCIONAMENTO
+//VARIÁVEIS -> Todas as variaveis em caixa alta são temporárias
+
+//INPUTS
+//Potencia_Aquecimento
+//Potencia_Encharque
+//Temperatura_Minima 
+//Temperatura_Desejada
+//Temperatura_Atual
+//Inicio_Controle_Diferenca
+//Numero_Passos
+
+//OUTPUTS
+//Potencia de Controle -> Valor de referencia para a Saída Analógica de Controle
+
+// SE A TEMPERATURA FOR MENOR QUE (temp_Min - 20 -> JC M003)
+      L     #TemperaturaMinima
+      L     #InicioControleDiferenca
+      -R    
+      T     #TEMP_INICIO_CONTROLE
+      L     #TemperaturaAtual
+      >R    
+      JC    M001
+
+//VALORES DE REFERENCIA PARA CALCULO DE POTENCIA DESEJADA
+//Calcula fator de multiplicação de temperatura para controle
+      L     #TemperaturaDesejada
+      L     #TEMP_INICIO_CONTROLE
+      -R    
+      T     #DIFERENCA_TEMP_PARAMETRO
+      L     #NumeroPassos
+      /R    
+      T     #DELTA_TEMPERATURA          //FATOR DE MULTIPLICAÇÃO
+
+//Calcula fator de multiplicação de potencia para controle
+      L     #PotenciaAquecimento
+      L     #PotenciaEncharque
+      -R    
+      T     #DIFERENCA_POTENCIA
+      L     #DIFERENCA_POTENCIA
+      L     #NumeroPassos
+      /R    
+      T     #DELTA_POTENCIA             //FATOR DE MULTIPLICAÇÃO
+
+
+//VERIRICA QUAL O PASSO DE ACORDO COM A DIFERENCA DE TEMPERATURA
+      L     #TemperaturaDesejada
+      L     #TemperaturaAtual
+      -R    
+      T     #DIFERENCA_TEMP_ATUAL
+
+      L     #DIFERENCA_TEMP_ATUAL
+      L     #DELTA_TEMPERATURA
+      /R    
+      T     #AUXILIAR
+      TRUNC 
+      DTR   
+      T     #AUXILIAR
+
+      L     #NumeroPassos
+      L     #AUXILIAR
+      -R    
+      TRUNC 
+      T     #PASSO_ATUAL_I
+      DTR   
+      T     #PASSO_ATUAL_R
+
+//CALCULA O VALOR DE POTENCIA
+      L     #DELTA_POTENCIA
+      L     #PASSO_ATUAL_R
+      *R    
+      T     #AUXILIAR
+      L     #PotenciaAquecimento
+      L     #AUXILIAR
+      -R    
+      T     #AUXILIAR_VALOR_POTENCIA
+      JU    M002
+
+//Para caso < Temp_Min-20
+M001: NOP   0
+      L     #PotenciaAquecimento
+      T     #AUXILIAR_VALOR_POTENCIA
+      JU    M004
+
+//Para caso de valores negativos
+M002: NOP   0
+      L     0.000000e+000
+      L     #AUXILIAR_VALOR_POTENCIA
+      <R    
+      JC    M004
+
+//Carrega zero para valores negativos
+      NOP   0
+      L     0.000000e+000
+      T     #AUXILIAR_VALOR_POTENCIA
+
+//SAIDA DE CONTROLE DE POTENCIA
+M004: NOP   0
+      L     #AUXILIAR_VALOR_POTENCIA
+      RND   
+      T     #Potencia_de_Controle

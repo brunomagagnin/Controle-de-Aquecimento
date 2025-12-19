@@ -2,100 +2,122 @@
 //VARIÁVEIS -> Todas as variaveis em caixa alta são temporárias
 
 //INPUTS
-//Potencia_Aquecimento
-//Potencia_Encharque
-//Temperatura_Minima 
-//Temperatura_Desejada
-//Temperatura_Atual
-//Inicio_Controle_Diferenca
-//Numero_Passos
+//Potencia_Aquecimento -> preset da IHM
+//Potencia_Encharque -> preset da IHM
+//Temperatura_Minima -> receita para grafico IHM
+//Temperatura_Desejada -> SetPoint de temperatura na receita
+//Temperatura_Atual -> Valor medido pelo pirometro
+//Inicio_Controle_Diferenca -> Da temperatura minima, valor que subtraido resulta
+//no valor de inicio do controle.
+//Numero_Passos -> Quantidade de degraus para regressão do valor de potencia.
 
 //OUTPUTS
 //Potencia de Controle -> Valor de referencia para a Saída Analógica de Controle
 
 // SE A TEMPERATURA FOR MENOR QUE (temp_Min - 20 -> JC M003)
-      L     #TemperaturaMinima
-      L     #InicioControleDiferenca
-      -R    
+      L     #Temperatura_Minima
+      L     #Inicio_Controle_Diferenca
+      -R
       T     #TEMP_INICIO_CONTROLE
-      L     #TemperaturaAtual
-      >R    
+      L     #Temperatura_Atual
+      >R
       JC    M001
+
+// SE A TEMPERATURA ULTRAPASSAR O SETPOINT
+      L     #Temperatura_Atual
+      L     #Temperatura_Desejada
+      -R
+      T     #AUXILIAR_S
+      L     10.0
+      >R
+      JC    M003
+
+      L     #AUXILIAR_S
+      L     5.0
+      >R
+      JC    M004
 
 //VALORES DE REFERENCIA PARA CALCULO DE POTENCIA DESEJADA
 //Calcula fator de multiplicação de temperatura para controle
-      L     #TemperaturaDesejada
+      L     #Temperatura_Desejada
       L     #TEMP_INICIO_CONTROLE
-      -R    
+      -R
       T     #DIFERENCA_TEMP_PARAMETRO
-      L     #NumeroPassos
-      /R    
-      T     #DELTA_TEMPERATURA          //FATOR DE MULTIPLICAÇÃO
+      L     #Numero_Passos
+      /R
+      T     #DELTA_TEMPERATURA   //FATOR DE MULTIPLICAÇÃO
 
 //Calcula fator de multiplicação de potencia para controle
-      L     #PotenciaAquecimento
-      L     #PotenciaEncharque
-      -R    
+      L     #Potencia_Aquecimento
+      L     #Potencia_Encharque
+      -R
       T     #DIFERENCA_POTENCIA
       L     #DIFERENCA_POTENCIA
-      L     #NumeroPassos
-      /R    
-      T     #DELTA_POTENCIA             //FATOR DE MULTIPLICAÇÃO
-
+      L     #Numero_Passos
+      /R
+      T     #DELTA_POTENCIA      //FATOR DE MULTIPLICAÇÃO
 
 //VERIRICA QUAL O PASSO DE ACORDO COM A DIFERENCA DE TEMPERATURA
-      L     #TemperaturaDesejada
-      L     #TemperaturaAtual
-      -R    
+      L     #Temperatura_Desejada
+      L     #Temperatura_Atual
+      -R
       T     #DIFERENCA_TEMP_ATUAL
 
       L     #DIFERENCA_TEMP_ATUAL
       L     #DELTA_TEMPERATURA
-      /R    
+      /R
       T     #AUXILIAR
-      TRUNC 
-      DTR   
+      TRUNC
+      DTR
       T     #AUXILIAR
 
-      L     #NumeroPassos
+      L     #Numero_Passos
       L     #AUXILIAR
-      -R    
-      TRUNC 
+      -R
+      TRUNC
       T     #PASSO_ATUAL_I
-      DTR   
+      DTR
       T     #PASSO_ATUAL_R
 
 //CALCULA O VALOR DE POTENCIA
       L     #DELTA_POTENCIA
       L     #PASSO_ATUAL_R
-      *R    
+      *R
       T     #AUXILIAR
-      L     #PotenciaAquecimento
+      L     #Potencia_Aquecimento
       L     #AUXILIAR
-      -R    
+      -R
       T     #AUXILIAR_VALOR_POTENCIA
-      JU    M002
+      JC    M002
 
-//Para caso < Temp_Min-20
-M001: NOP   0
-      L     #PotenciaAquecimento
+//Caso Temperatura Atual seja inferior ao piso mínimo
+M001: NOP 0
+      L     #Potencia_Aquecimento
       T     #AUXILIAR_VALOR_POTENCIA
-      JU    M004
+      JC    M005
 
-//Para caso de valores negativos
-M002: NOP   0
-      L     0.000000e+000
+//Caso ocorram valores negativos
+M002: NOP 0
+      L     0.0
       L     #AUXILIAR_VALOR_POTENCIA
-      <R    
-      JC    M004
+      <R
+      JC    M005
 
-//Carrega zero para valores negativos
-      NOP   0
-      L     0.000000e+000
+//Caso ultrapassar o valor de setpoint em 10C
+M003: NOP 0
+      L     0.0
+      T     #AUXILIAR_VALOR_POTENCIA
+      JC    M005
+
+//Caso ultrapassar o valor de setpoint em 5C
+M004: NOP 0
+      L     #Potencia_Encharque
+      L     2.0
+      /R
       T     #AUXILIAR_VALOR_POTENCIA
 
 //SAIDA DE CONTROLE DE POTENCIA
-M004: NOP   0
+M005: NOP 0
       L     #AUXILIAR_VALOR_POTENCIA
-      RND   
-      T     #Potencia_de_Controle
+      RND
+      T     #Potencia_De_Controle

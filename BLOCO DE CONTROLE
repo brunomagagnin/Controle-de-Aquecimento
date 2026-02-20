@@ -1,123 +1,177 @@
-//SOBRE A CONSTRUÇÃO DESSE BLOCO E FUNCIONAMENTO
-//VARIÁVEIS -> Todas as variaveis em caixa alta são temporárias
+//Lista de Símbolos (Declarações de Interface e Temporárias)
+//INPUTS:
+	r_Pot_Nominal (Real): Potência máxima de aquecimento.
+	r_Pot_Sustentacao (Real): Potência de encharque/manutenção.
+	r_PV_Temp (Real): Temperatura atual lida pelo sensor.
+	r_SP_Temp (Real): Temperatura desejada (Setpoint).
+	r_Band_Ctrl (Real): Diferença de temperatura para início do controle.
+	r_Qtd_Degraus (Real): Quantidade de divisões para a rampa.
 
-//INPUTS
-//Potencia_Aquecimento -> preset da IHM
-//Potencia_Encharque -> preset da IHM
-//Temperatura_Minima -> receita para grafico IHM
-//Temperatura_Desejada -> SetPoint de temperatura na receita
-//Temperatura_Atual -> Valor medido pelo pirometro
-//Inicio_Controle_Diferenca -> Da temperatura minima, valor que subtraido resulta
-//no valor de inicio do controle.
-//Numero_Passos -> Quantidade de degraus para regressão do valor de potencia.
+//OUTPUTS:
+	i_Out_Analog (Int): Valor de saída para o controle de potência.
 
-//OUTPUTS
-//Potencia de Controle -> Valor de referencia para a Saída Analógica de Controle
+//Variáveis Temporárias:
+R_DIFF_POTENCIA (Real)
+R_DELTA_POTENCIA (Real)
+R_DIFF_TEMP_PARAM (Real)
+R_TEMP_START_CTRL (Real)
+R_DIFF_PV_SP (Real)
+R_DELTA_TEMP (Real)
+R_CALC_OUT_REAL (Real)
+R_AUXILIAR (Real)
+I_PASSO_ATUAL (Int)
+R_PASSO_ATUAL (Real)
+R_AUX_DIFF_TEMP (Real)
+R_AUX_LIM_TEMP (Real)
+R_DIFF_TEMP_LIM (Real)
+R_DELTA_TEMP_LIM (Real)
+R_DELTA_POT_LIM (Real)
+R_AUX_PASSO_LIM (Real)
 
-// SE A TEMPERATURA FOR MENOR QUE (temp_Min - 20 -> JC M003)
-      L     #Temperatura_Minima
-      L     #Inicio_Controle_Diferenca
-      -R
-      T     #TEMP_INICIO_CONTROLE
-      L     #Temperatura_Atual
-      >R
-      JC    M001
 
-// SE A TEMPERATURA ULTRAPASSAR O SETPOINT
-      L     #Temperatura_Atual
-      L     #Temperatura_Desejada
-      -R
-      T     #AUXILIAR_S
-      L     10.0
-      >R
+// --- CÁLCULO DO PONTO DE INÍCIO DO CONTROLE ---
+      L     #r_SP_Temp
+      L     #r_Band_Ctrl
+      -R    
+      T     #R_TEMP_START_CTRL
+
+// --- VERIFICAÇÃO DE FAIXA DE OPERAÇÃO ---
+      L     #r_PV_Temp
+      L     #R_TEMP_START_CTRL
+      >R    
       JC    M003
 
-      L     #AUXILIAR_S
-      L     5.0
-      >R
-      JC    M004
+// --- VERIFICAÇÃO DE SOBRE-TEMPERATURA (OVERSETPOINT) ---
+      L     #r_PV_Temp
+      L     #r_SP_Temp
+      -R    
+      T     #R_AUX_DIFF_TEMP
 
-//VALORES DE REFERENCIA PARA CALCULO DE POTENCIA DESEJADA
-//Calcula fator de multiplicação de temperatura para controle
-      L     #Temperatura_Desejada
-      L     #TEMP_INICIO_CONTROLE
-      -R
-      T     #DIFERENCA_TEMP_PARAMETRO
-      L     #Numero_Passos
-      /R
-      T     #DELTA_TEMPERATURA   //FATOR DE MULTIPLICAÇÃO
-
-//Calcula fator de multiplicação de potencia para controle
-      L     #Potencia_Aquecimento
-      L     #Potencia_Encharque
-      -R
-      T     #DIFERENCA_POTENCIA
-      L     #DIFERENCA_POTENCIA
-      L     #Numero_Passos
-      /R
-      T     #DELTA_POTENCIA      //FATOR DE MULTIPLICAÇÃO
-
-//VERIRICA QUAL O PASSO DE ACORDO COM A DIFERENCA DE TEMPERATURA
-      L     #Temperatura_Desejada
-      L     #Temperatura_Atual
-      -R
-      T     #DIFERENCA_TEMP_ATUAL
-
-      L     #DIFERENCA_TEMP_ATUAL
-      L     #DELTA_TEMPERATURA
-      /R
-      T     #AUXILIAR
-      TRUNC
-      DTR
-      T     #AUXILIAR
-
-      L     #Numero_Passos
-      L     #AUXILIAR
-      -R
-      TRUNC
-      T     #PASSO_ATUAL_I
-      DTR
-      T     #PASSO_ATUAL_R
-
-//CALCULA O VALOR DE POTENCIA
-      L     #DELTA_POTENCIA
-      L     #PASSO_ATUAL_R
-      *R
-      T     #AUXILIAR
-      L     #Potencia_Aquecimento
-      L     #AUXILIAR
-      -R
-      T     #AUXILIAR_VALOR_POTENCIA
+      L     #R_AUX_DIFF_TEMP
+      L     5.000000e-001
+      >R    
       JC    M002
 
-//Caso Temperatura Atual seja inferior ao piso mínimo
-M001: NOP 0
-      L     #Potencia_Aquecimento
-      T     #AUXILIAR_VALOR_POTENCIA
+// --- CÁLCULO DOS PARÂMETROS DE CONTROLE (RAMPA) ---
+// Fator de temperatura por degrau
+      L     #r_SP_Temp
+      L     #R_TEMP_START_CTRL
+      -R    
+      T     #R_DIFF_TEMP_PARAM
+
+      L     #R_DIFF_TEMP_PARAM
+      L     #r_Qtd_Degraus
+      /R    
+      T     #R_DELTA_TEMP
+
+// Fator de potência por degrau
+      L     #r_Pot_Nominal
+      L     #r_Pot_Sustentacao
+      -R    
+      T     #R_DIFF_POTENCIA
+
+      L     #R_DIFF_POTENCIA
+      L     #r_Qtd_Degraus
+      /R    
+      T     #R_DELTA_POTENCIA
+
+// --- DETERMINAÇÃO DO PASSO ATUAL ---
+      L     #r_SP_Temp
+      L     #r_PV_Temp
+      -R    
+      T     #R_DIFF_PV_SP
+
+      L     #R_DIFF_PV_SP
+      L     #R_DELTA_TEMP
+      /R    
+      T     #R_AUXILIAR
+
+      TRUNC 
+      DTR   
+      T     #R_AUXILIAR
+
+      L     #r_Qtd_Degraus
+      L     #R_AUXILIAR
+      -R    
+      TRUNC 
+      T     #I_PASSO_ATUAL
+      DTR   
+      T     #R_PASSO_ATUAL
+
+// --- CÁLCULO DA POTÊNCIA DE SAÍDA ---
+      L     #R_DELTA_POTENCIA
+      L     #R_PASSO_ATUAL
+      *R    
+      T     #R_AUXILIAR
+
+      L     #r_Pot_Nominal
+      L     #R_AUXILIAR
+      -R    
+      T     #R_CALC_OUT_REAL
+      JC    M004
+
+// --- LÓGICA PARA CASO ULTRAPASSE O SETPOINT EM +0.5C ---
+M002: NOP   0
+      L     #r_SP_Temp
+      L     5.000000e+000
+      +R    
+      T     #R_AUX_LIM_TEMP
+
+      L     1.000000e+000
+      T     #R_DELTA_TEMP_LIM
+
+      L     #r_Pot_Sustentacao
+      L     5.000000e+000
+      /R    
+      T     #R_DELTA_POT_LIM
+
+      L     #R_AUX_LIM_TEMP
+      L     #r_PV_Temp
+      -R    
+      T     #R_DIFF_TEMP_LIM
+
+      L     #R_DIFF_TEMP_LIM
+      L     #R_DELTA_TEMP_LIM
+      /R    
+      T     #R_AUX_PASSO_LIM
+
+      TRUNC 
+      DTR   
+      T     #R_AUX_PASSO_LIM
+
+      L     #R_AUX_PASSO_LIM
+      TRUNC 
+      T     #I_PASSO_ATUAL
+      DTR   
+      T     #R_PASSO_ATUAL
+
+// CÁLCULO DA POTÊNCIA NO LIMITE SUPERIOR
+      L     #R_DELTA_POT_LIM
+      L     #R_PASSO_ATUAL
+      *R    
+      T     #R_CALC_OUT_REAL
+      JC    M004
+
+// --- CASO TEMPERATURA MUITO BAIXA (POTÊNCIA MÁXIMA) ---
+M003: NOP   0
+      L     #r_Pot_Nominal
+      T     #R_CALC_OUT_REAL
+      JC    M006
+
+// --- TRATAMENTO DE VALORES NEGATIVOS ---
+M004: NOP   0
+      L     #R_CALC_OUT_REAL
+      L     0.000000e+000
+      <R    
       JC    M005
+      JC    M006
 
-//Caso ocorram valores negativos
-M002: NOP 0
-      L     0.0
-      L     #AUXILIAR_VALOR_POTENCIA
-      <R
-      JC    M005
+M005: NOP   0
+      L     0.000000e+000
+      T     #R_CALC_OUT_REAL
 
-//Caso ultrapassar o valor de setpoint em 10C
-M003: NOP 0
-      L     0.0
-      T     #AUXILIAR_VALOR_POTENCIA
-      JC    M005
-
-//Caso ultrapassar o valor de setpoint em 5C
-M004: NOP 0
-      L     #Potencia_Encharque
-      L     2.0
-      /R
-      T     #AUXILIAR_VALOR_POTENCIA
-
-//SAIDA DE CONTROLE DE POTENCIA
-M005: NOP 0
-      L     #AUXILIAR_VALOR_POTENCIA
-      RND
-      T     #Potencia_De_Controle
+// --- FINALIZAÇÃO E CONVERSÃO PARA SAÍDA ANALÓGICA ---
+M006: NOP   0
+      L     #R_CALC_OUT_REAL
+      RND   
+      T     #i_Out_Analog

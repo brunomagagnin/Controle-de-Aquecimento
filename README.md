@@ -53,4 +53,4 @@ As variáveis de cálculo interno utilizam o padrão CAIXA ALTA para fácil iden
       L     #r_PV_Temp
       L     #R_TEMP_START_CTRL
       >R    
-      JC    M003  // Se muito frio, pula para Potência Máxima
+      JC    M003
